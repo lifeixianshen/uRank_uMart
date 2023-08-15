@@ -55,7 +55,7 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     metrics_val = sess.run(metrics_values)
     expanded_metrics_val = get_expaned_metrics(metrics_val, params.top_ks)
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in expanded_metrics_val.items())
-    logging.info("- Train metrics: " + metrics_string)
+    logging.info(f"- Train metrics: {metrics_string}")
 
 
 # NDCG@10
@@ -112,31 +112,33 @@ def train_and_evaluate(train_model_spec, eval_model_spec,
             if os.path.isdir(save_path):
                 save_path = tf.train.latest_checkpoint(save_path)
                 # begin_at_epoch = int(restore_from.split('-')[-1])           
-            logging.info("Restoring parameters from {}".format(save_path))
+            logging.info(f"Restoring parameters from {save_path}")
             # last_saver = tf.train.import_meta_graph(save_path+".meta")
             pretrained_include = ['model/mlp']
             if params.loss_fn=='urrank':
                 pretrained_include = ['model/ur']
-            for i in range(1, learner_id):
-                pretrained_include.append('residual_mlp_{}'.format(learner_id))
-
+            pretrained_include.extend(
+                f'residual_mlp_{learner_id}' for _ in range(1, learner_id)
+            )
             pretrained_vars = tf.contrib.framework.get_variables_to_restore(include=pretrained_include)
             pretrained_saver = tf.train.Saver(pretrained_vars, name="pretrained_saver")
             pretrained_saver.restore(sess, save_path)
             [best_eval_metric, second_eval_metric, third_eval_metric, forth_eval_metric] = \
             load_best_ndcgs(best_json_path)
-            # print('[best_eval_metric, second_eval_metric, third_eval_metric, forth_eval_metric]', \
-            # [best_eval_metric, second_eval_metric, third_eval_metric, forth_eval_metric])
+                    # print('[best_eval_metric, second_eval_metric, third_eval_metric, forth_eval_metric]', \
+                    # [best_eval_metric, second_eval_metric, third_eval_metric, forth_eval_metric])
         # for each learner
         early_stopping_count = 0
         for epoch in range(begin_at_epoch, begin_at_epoch + params.num_epochs):
             if early_stopping_count == int(params.early_stoping_epochs):
-                logging.info("Early stopping at learner {}, epoch {}/{}".format(learner_id, epoch + 1, \
-                    begin_at_epoch + params.num_epochs))
+                logging.info(
+                    f"Early stopping at learner {learner_id}, epoch {epoch + 1}/{begin_at_epoch + params.num_epochs}"
+                )
                 break
             # Run one epoch
-            logging.info("Learner {}, Epoch {}/{}".format(learner_id, epoch + 1, \
-                begin_at_epoch + params.num_epochs))
+            logging.info(
+                f"Learner {learner_id}, Epoch {epoch + 1}/{begin_at_epoch + params.num_epochs}"
+            )
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
             train_sess(sess, train_model_spec, num_steps, train_writer, params)
@@ -176,7 +178,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec,
                 best_save_path = os.path.join(model_dir, 'best_weights', 'after-epoch')
                 # global_epoch = int(params.num_learners) * int(params.num_epochs) + epoch + 1
                 best_save_path = best_saver.save(sess, best_save_path, global_step=global_epoch)
-                logging.info("- Found new best metric score, saving in {}".format(best_save_path))
+                logging.info(f"- Found new best metric score, saving in {best_save_path}")
                 # Save best eval metrics in a json file in the model directory
                 save_dict_to_json(metrics, best_json_path)
                 save_dict_to_json({'stopped_at_learner': learner_id}, \

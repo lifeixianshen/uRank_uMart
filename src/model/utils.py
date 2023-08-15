@@ -105,7 +105,7 @@ def get_expaned_metrics(metrics_val, top_ks):
     for tag, val in metrics_val.items():
         if tag == 'ndcg':
             for i in range(len(val)):
-                expanded_metrics_val['{}_{}'.format(tag, top_ks[i])] = val[i][0]
+                expanded_metrics_val[f'{tag}_{top_ks[i]}'] = val[i][0]
         else:
             expanded_metrics_val[tag] = val
     return expanded_metrics_val

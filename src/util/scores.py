@@ -1,8 +1,7 @@
 import tensorflow as tf
 
 def get_pairwise_scores(predicted_scores):
-	pairwise_predicted_scores = predicted_scores - tf.transpose(predicted_scores)
-	return pairwise_predicted_scores
+	return predicted_scores - tf.transpose(predicted_scores)
 
 
 def get_pairwise_label_scores(labels):
@@ -15,5 +14,4 @@ def get_pairwise_label_scores(labels):
 def get_softmax_pairwise_scores(predicted_scores):
 	exp_predicted_scores = 2 ** predicted_scores
 	exp_predicted_scores = tf.divide(exp_predicted_scores, tf.reduce_sum(exp_predicted_scores))
-	pairwise_predicted_scores = exp_predicted_scores - tf.transpose(exp_predicted_scores)
-	return pairwise_predicted_scores
+	return exp_predicted_scores - tf.transpose(exp_predicted_scores)

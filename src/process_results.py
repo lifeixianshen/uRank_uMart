@@ -2,8 +2,7 @@ import glob
 import pandas as pd
 
 def getPaths():
-	txt_files = glob.glob('*.txt')
-	return txt_files
+	return glob.glob('*.txt')
 	# for file_path in txt_files:
 	# 	print(file_path)
 
@@ -78,4 +77,4 @@ txt_files.sort()
 for file_path in txt_files:
 	dataset, model = get_data_model(file_path)
 	results = get_ndcgs_errs(file_path)
-	print(dataset, model, '  '.join('& * ' + str(v) for v in results))
+	print(dataset, model, '  '.join(f'& * {str(v)}' for v in results))

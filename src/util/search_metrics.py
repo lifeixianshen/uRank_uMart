@@ -360,51 +360,50 @@ def get_search_metric_fn(labels, predictions,
       # avoid adding duplicate metrics.
       continue
 
-    search_metric_factory = SUPPORTED_SEARCH_METRICS.get(metric_name)
-    if search_metric_factory:
-      if metric_name == 'ndcg':
-        if use_ndcg_metrics == True:
-          # for top_k in ndcg_top_ks:
-          metric_name_ndcg_top_k = metric_name
-          # metric name will show as ndcg_1, ndcg_10, ...
-          # metric_name_ndcg_top_k = metric_name + '_' + str(top_k)
-          # top_k_int = tf.constant(top_k, dtype=tf.int32)
-          # # Note: having weights in ndcg does not make much sense
-          # # Because ndcg already has position weights/discounts
-          # # Thus weights are not applied in ndcg metric
-          value_op, update_op = search_metric_factory(
-            labels=labels,
-            predictions=predictions,
-            name=metric_name_ndcg_top_k,
-            top_ks=ndcg_top_ks,
-            use_predicted_order=use_predicted_order)
-          eval_metric_ops[metric_name_ndcg_top_k] = (value_op, update_op)
-      elif metric_name == 'err':
-        if use_err_metric == True:
-          for top_k in ndcg_top_ks:
-            # metric name will show as err_1, err_10, ...
-            metric_name_err_top_k = metric_name + '_' + str(top_k)
-            top_k_int = tf.constant(top_k, dtype=tf.int32)
-            # # Note: having weights in err does not make much sense
-            # # Because err already has position weights/discounts
-            # # Thus weights are not applied in err metric
-            value_op, update_op = search_metric_factory(
-              labels=labels,
-              predictions=predictions,
-              name=metric_name_err_top_k,
-              top_k_int=top_k_int,
-              use_predicted_order=use_predicted_order)
-            eval_metric_ops[metric_name_err_top_k] = (value_op, update_op)       
-      else:
-        metric_name = metric_name.lower()
+    if not (search_metric_factory :=
+            SUPPORTED_SEARCH_METRICS.get(metric_name)):
+      raise ValueError(f'Cannot find the search metric named {metric_name}')
+
+    if metric_name == 'ndcg':
+      if use_ndcg_metrics == True:
+        # for top_k in ndcg_top_ks:
+        metric_name_ndcg_top_k = metric_name
+        # metric name will show as ndcg_1, ndcg_10, ...
+        # metric_name_ndcg_top_k = metric_name + '_' + str(top_k)
+        # top_k_int = tf.constant(top_k, dtype=tf.int32)
+        # # Note: having weights in ndcg does not make much sense
+        # # Because ndcg already has position weights/discounts
+        # # Thus weights are not applied in ndcg metric
         value_op, update_op = search_metric_factory(
           labels=labels,
           predictions=predictions,
-          name=metric_name)
-        eval_metric_ops[metric_name] = (value_op, update_op)          
+          name=metric_name_ndcg_top_k,
+          top_ks=ndcg_top_ks,
+          use_predicted_order=use_predicted_order)
+        eval_metric_ops[metric_name_ndcg_top_k] = (value_op, update_op)
+    elif metric_name == 'err':
+      if use_err_metric == True:
+        for top_k in ndcg_top_ks:
+            # metric name will show as err_1, err_10, ...
+          metric_name_err_top_k = f'{metric_name}_{str(top_k)}'
+          top_k_int = tf.constant(top_k, dtype=tf.int32)
+          # # Note: having weights in err does not make much sense
+          # # Because err already has position weights/discounts
+          # # Thus weights are not applied in err metric
+          value_op, update_op = search_metric_factory(
+            labels=labels,
+            predictions=predictions,
+            name=metric_name_err_top_k,
+            top_k_int=top_k_int,
+            use_predicted_order=use_predicted_order)
+          eval_metric_ops[metric_name_err_top_k] = (value_op, update_op)
     else:
-      raise ValueError('Cannot find the search metric named ' + metric_name)
-
+      metric_name = metric_name.lower()
+      value_op, update_op = search_metric_factory(
+        labels=labels,
+        predictions=predictions,
+        name=metric_name)
+      eval_metric_ops[metric_name] = (value_op, update_op)
   if use_binary_metrics:
     # add binary metrics to eval_metric_ops dict
     for metric_name in binary_metrics:
@@ -415,13 +414,12 @@ def get_search_metric_fn(labels, predictions,
 
       metric_name = metric_name.lower()  # metric name are case insensitive.
       binary_metric_factory, requires_threshold = SUPPORTED_BINARY_CLASS_METRICS.get(metric_name)
-      if binary_metric_factory:
-        value_op, update_op = binary_metric_factory(
-          labels=labels,
-          predictions=(hard_preds if requires_threshold else predictions),
-          name=metric_name)
-        eval_metric_ops[metric_name] = (value_op, update_op)
-      else:
-        raise ValueError('Cannot find the binary metric named ' + metric_name)
+      if not binary_metric_factory:
+        raise ValueError(f'Cannot find the binary metric named {metric_name}')
 
+      value_op, update_op = binary_metric_factory(
+        labels=labels,
+        predictions=(hard_preds if requires_threshold else predictions),
+        name=metric_name)
+      eval_metric_ops[metric_name] = (value_op, update_op)
   return eval_metric_ops

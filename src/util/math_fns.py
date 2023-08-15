@@ -48,13 +48,7 @@ def cal_ndcg(label_scores, predicted_scores, top_ks=[1, 3, 5, 10], use_predicted
   # idcg is 0 if label_scores are all 0
   ndcgs = safe_div(cumsum_dcgs, cumsum_idcgs, 'ndcgs')
   k_indices = [tf.minimum(max_prediction_size, v) - 1 for v in top_ks]
-  k_ndcgs = tf.gather(ndcgs, k_indices)
-  # dcg = _dcg_idcg(predicted_relevance, cg_discount)
-  # idcg = _dcg_idcg(sorted_relevance, cg_discount)
-  # the ndcg score of the batch
-  # # idcg is 0 if label_scores are all 0
-  # ndcg = safe_div(dcg, idcg, 'one_ndcg')
-  return k_ndcgs
+  return tf.gather(ndcgs, k_indices)
 
 def cal_swapped_ndcg(label_scores, predicted_scores, top_k_int):
   """
@@ -95,8 +89,7 @@ def cal_swapped_ndcg(label_scores, predicted_scores, top_k_int):
   new_dcg = dcg - tiled_ij + new_ij - tiled_ji + new_ji
 
   new_ndcg = safe_div(new_dcg, idcg, 'new_ndcg_in_lambdarank_training')
-  swapped_ndcg = tf.abs(ndcg - new_ndcg)
-  return swapped_ndcg
+  return tf.abs(ndcg - new_ndcg)
 
 def diff_idcg_dcg(label_scores, predicted_scores, top_k_int):
   return cal_idcg(label_scores, predicted_scores, top_k_int) - \
@@ -166,10 +159,7 @@ def cal_dcg_ks(label_scores, top_k_int):
 
   cg_discount = _get_cg_discount(top_k_int)
 
-  # cg_discount is safe as a denominator
-  dcg_k = predicted_relevance / cg_discount
-
-  return dcg_k
+  return predicted_relevance / cg_discount
 
 
 def cal_idcg_ks(label_scores, top_k_int):
@@ -191,10 +181,7 @@ def cal_idcg_ks(label_scores, top_k_int):
 
   cg_discount = _get_cg_discount(top_k_int)
 
-  # cg_discount is safe as a denominator
-  idcg_k = ideal_relevance / cg_discount
-
-  return idcg_k
+  return ideal_relevance / cg_discount
 
 def cal_err(label_scores, predicted_scores, top_k_int=1, use_predicted_order=False):
   """
@@ -226,8 +213,7 @@ def cal_err(label_scores, predicted_scores, top_k_int=1, use_predicted_order=Fal
   products = tf.multiply(predicted_relevance_ratio, prob_stepdown)
   products = tf.cast(products, dtype=tf.float32)
   errs = tf.divide(products, cur_rank)
-  err = tf.reduce_sum(errs)
-  return err
+  return tf.reduce_sum(errs)
 
 
 def _dcg_idcg(relevance_scores, cg_discount):
@@ -327,8 +313,7 @@ def _get_cg_discount(top_k_int=1):
   top_k_range = tf.reshape(top_k_range, [-1, 1])
   # cast top_k_range to float
   top_k_range = tf.cast(top_k_range, dtype=tf.float32)
-  cg_discount = tf.log(top_k_range + 1.0) / log_2
-  return cg_discount
+  return tf.log(top_k_range + 1.0) / log_2
 
 
 def _get_relevance_scores(scores):

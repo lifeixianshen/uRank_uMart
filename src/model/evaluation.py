@@ -46,23 +46,25 @@ def evaluate_sess(sess, model_spec, num_steps, writer=None, params=None):
             # logging.warning("- label_per_query_list_string: \n" + label_per_query_list_string)
             # label_gains_list_string = "\n".join(str(v[0]) for v in label_gains_list)
             # logging.info("- label_gains_list: \n" + label_gains_list_string)
-            label_list.extend(['{} qid:{} 1:{}'.format(int(label_per_query_list[i][0]), \
-                temp_query_id, \
-                label_gains_list[i][0]) \
-                for i in range(0, len(label_per_query_list))])
+            label_list.extend(
+                [
+                    f'{int(label_per_query_list[i][0])} qid:{temp_query_id} 1:{label_gains_list[i][0]}'
+                    for i in range(0, len(label_per_query_list))
+                ]
+            )
         save_predictions_to_file(prediction_list, "./prediction_output")
         # tensorflow mess up test input orders
         save_predictions_to_file(label_list, "./label_output")
     else:
         # only update metrics
-        for temp_query_id in range(int(num_steps)):
+        for _ in range(int(num_steps)):
             sess.run(update_metrics)
     # Get the values of the metrics
     metrics_values = {k: v[0] for k, v in eval_metrics.items()}
     metrics_val = sess.run(metrics_values)
     expanded_metrics_val = get_expaned_metrics(metrics_val, params.top_ks)
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in expanded_metrics_val.items())
-    logging.info("- Eval metrics: " + metrics_string)
+    logging.info(f"- Eval metrics: {metrics_string}")
     # Add summaries manually to writer at global_step_val
     if writer is not None:
         global_step_val = sess.run(global_step)
@@ -100,5 +102,5 @@ def evaluate(model_spec, model_dir, params, restore_from):
         num_steps = (params.test_size + params.batch_size - 1) // params.batch_size
         metrics = evaluate_sess(sess, model_spec, num_steps, params=params)
         metrics_name = '_'.join(restore_from.split('/'))
-        save_path = os.path.join(model_dir, "metrics_test_{}.json".format(metrics_name))
+        save_path = os.path.join(model_dir, f"metrics_test_{metrics_name}.json")
         save_dict_to_json(metrics, save_path)

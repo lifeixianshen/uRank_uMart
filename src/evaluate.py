@@ -1,5 +1,6 @@
 """Evaluate the model"""
 
+
 import argparse
 import logging
 import os
@@ -40,7 +41,9 @@ if __name__ == '__main__':
     # Load the parameters
     args = parser.parse_args()
     json_path = os.path.join(args.model_dir, 'params.json')
-    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    assert os.path.isfile(
+        json_path
+    ), f"No json configuration file found at {json_path}"
     params = Params(json_path)
     if params.mlp_sizes is None or len(params.mlp_sizes) == 0:
         logging.error('mlp_sizes are not set correctly, at least one MLP layer is required')
@@ -49,12 +52,16 @@ if __name__ == '__main__':
         params.dict['use_residual'] = True
     # Load the parameters from the dataset, that gives the size etc. into params
     json_path = os.path.join(args.data_dir, 'dataset_params.json')
-    assert os.path.isfile(json_path), "No json file found at {}, run build.py".format(json_path)
+    assert os.path.isfile(
+        json_path
+    ), f"No json file found at {json_path}, run build.py"
     params.update(json_path)
     # Set the logger
     set_logger(os.path.join(args.model_dir, 'evaluate.log'))
     # # Get paths for tfrecords
-    path_eval_tfrecords = os.path.join(args.data_dir, 'test_' + args.tfrecords_filename)
+    path_eval_tfrecords = os.path.join(
+        args.data_dir, f'test_{args.tfrecords_filename}'
+    )
     # Create the input data pipeline
     logging.info("Creating the dataset...")
     eval_dataset = load_dataset_from_tfrecords(path_eval_tfrecords)
@@ -70,5 +77,5 @@ if __name__ == '__main__':
     # print(node_names)
     logging.info("- done.")
     logging.info("Starting evaluation")
-    logging.info("Optimized using {} learners".format(weak_learner_id))
+    logging.info(f"Optimized using {weak_learner_id} learners")
     evaluate(eval_model_spec, args.model_dir, params, args.restore_from)

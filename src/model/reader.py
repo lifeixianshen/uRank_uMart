@@ -80,7 +80,7 @@ def input_fn(mode, dataset, params):
     unique_rating = tf.squeeze(unique_rating)
 
     iterator_init_op = iterator.initializer
-    inputs = {
+    return {
         'features': features,
         'labels': labels,
         'height': height,
@@ -88,9 +88,8 @@ def input_fn(mode, dataset, params):
         'unique_rating': unique_rating,
         'label_gains': label_gains,
         # 'use_predicted_order':False,
-        'iterator_init_op': iterator_init_op
-    }
-    return inputs   
+        'iterator_init_op': iterator_init_op,
+    }   
 
 def _shuffle_docs(labels, features, height, width):
     n_data = tf.shape(labels)[0]
@@ -110,7 +109,9 @@ if __name__ == "__main__":
     dataset = load_dataset_from_tfrecords("../data/OHSUMED/0/test_OHSUMED.tfrecords")
     args = parser.parse_args()
     json_path = os.path.join(args.model_dir, 'params.json')
-    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    assert os.path.isfile(
+        json_path
+    ), f"No json configuration file found at {json_path}"
     params = Params(json_path)
     mode = 'eval'
     # iterator_init_op = iterator.initializer    
@@ -122,5 +123,5 @@ if __name__ == "__main__":
         init_op = tf.global_variables_initializer()
         sess.run(init_op)
         sess.run(iterator_init_op)
-        for i in range(3):  
+        for _ in range(3):
             print(sess.run([label_gains, labels, unique_rating]))

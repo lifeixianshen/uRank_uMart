@@ -19,44 +19,38 @@ RAW_RANK_DATA = os.environ.get('RAW_RANK_DATA')
 TF_RANK_DATA = os.environ.get('TF_RANK_DATA')
 
 def get_OHSUMED_data_path(tfrecords_folder, fold_str, file_type):
-    OHSUMED_data_folder = os.path.join('OHSUMED', 'Feature-min', 'Fold{}'.format(fold_str))
+    OHSUMED_data_folder = os.path.join('OHSUMED', 'Feature-min', f'Fold{fold_str}')
     # OHSUMED
     # print('file_type', file_type)
     full_file_name = os.path.join(RAW_RANK_DATA, OHSUMED_data_folder, file_type)
     if file_type == 'train':
-        full_file_name += 'ing'    
+        full_file_name += 'ing'
     if file_type == 'vali':
         full_file_name += 'dation'
     full_file_name += 'set'
-    data_path = full_file_name + '.txt'
-    return data_path
+    return f'{full_file_name}.txt'
 
 def get_data_path(tfrecords_folder, fold_str, file_type):
     data_path = ''
-    # OHSUMED
     if tfrecords_folder == 'OHSUMED':
-        data_path = get_OHSUMED_data_path(tfrecords_folder, fold_str, file_type)
-    else:
+        return get_OHSUMED_data_path(tfrecords_folder, fold_str, file_type)
         # MQ2007_data
-        MS_data_folder = os.path.join(tfrecords_folder, 'Fold{}'.format(fold_str))
-        data_path = os.path.join(RAW_RANK_DATA, MS_data_folder, file_type + ".txt")
-    return data_path
+    MS_data_folder = os.path.join(tfrecords_folder, f'Fold{fold_str}')
+    return os.path.join(RAW_RANK_DATA, MS_data_folder, f"{file_type}.txt")
 
 def normalize_mean_max_feature_array(array):
     mean = array.mean(axis = 0)
     abs_max = abs(array.max(axis = 0))
     epilson = 1e-8
     abs_max = abs_max + epilson
-    normalized_array = (array - mean) / abs_max
-    return normalized_array
+    return (array - mean) / abs_max
 # this one is better than normalize_mean_max_feature_array
 def normalize_min_max_feature_array(array):
     mini = array.min(axis = 0)
     maxi = array.max(axis = 0)
     epilson = 1e-8
     value_range = maxi - mini + epilson
-    normalized_array = (array - mini) / value_range
-    return normalized_array
+    return (array - mini) / value_range
 
 def _bytes_feature(value):
     value = value if type(value) == list else [value]
@@ -79,9 +73,13 @@ def convert(tfrecords_folder, file_type, fold):
 
     # if file_type == 'vali':
     #     file_type = 'eval'
-    tfrecords_filename = tfrecords_folder + '.tfrecords'
-    complete_file_name = os.path.join(TF_RANK_DATA, tfrecords_folder, fold, \
-        file_type + "_" + tfrecords_filename)
+    tfrecords_filename = f'{tfrecords_folder}.tfrecords'
+    complete_file_name = os.path.join(
+        TF_RANK_DATA,
+        tfrecords_folder,
+        fold,
+        f"{file_type}_{tfrecords_filename}",
+    )
     writer = tf.python_io.TFRecordWriter(complete_file_name)
     max_height = 0
     with open(data_path, "r") as f:
@@ -94,7 +92,7 @@ def convert(tfrecords_folder, file_type, fold):
             label = float(splits[0])
             group = int(splits[1].split(":")[1])
             features = [float(split.split(":")[1]) for split in splits[2:]]
-            
+
             if group in group_features:
                 new_feature_list = group_features[group]
                 new_feature_list.append(features)
@@ -102,18 +100,15 @@ def convert(tfrecords_folder, file_type, fold):
 
                 new_label_list = group_labels[group]
                 new_label_list.append(label)
-                group_labels[group] = new_label_list 
+                group_labels[group] = new_label_list
             else:
-                feature_list = []   
-                feature_list.append(features)
+                feature_list = [features]
                 group_features[group] = feature_list  
 
-                label_list = []   
-                label_list.append(label)
+                label_list = [label]
                 group_labels[group] = label_list                 
 
-    query_ids = list(group_features.keys())
-    query_ids.sort()
+    query_ids = sorted(group_features.keys())
     # print('fold', fold, ', len', len(query_ids), ', file_type', file_type, ', query_ids', query_ids)
     num_queries = 0
     feature_dim = 0
@@ -124,7 +119,7 @@ def convert(tfrecords_folder, file_type, fold):
         label_array = np.asarray(label_list, dtype=np.float32)
         # remove line 136-138 to keep the original data
         # # remove all 0 label entries
-        
+
         if label_array.sum() < 1:
             # print('All 0 label entries: ', str(group), str(label_array.sum()))
             continue
@@ -166,9 +161,9 @@ def convert(tfrecords_folder, file_type, fold):
             'unique_rating': _int64_feature(unique_rating),     
             'label': _float_feature(label_list)}))
         writer.write(example.SerializeToString())
-    
+
     writer.close()
-    print('max_height in {} : {}'.format(tfrecords_folder, max_height))
+    print(f'max_height in {tfrecords_folder} : {max_height}')
     # query_ids = list(group_features.keys())
     feature_list_0 = group_features[query_ids[0]]
     feature_dim = len(feature_list_0[0])

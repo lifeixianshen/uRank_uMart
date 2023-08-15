@@ -73,14 +73,25 @@ def build_g_model(is_training, inputs, params):
 
 def _get_residual_mlp_logits(features, params, weak_learner_id=1):
     # features = tf.reshape(features, [-1, params.feature_dim])
-    with tf.variable_scope('residual_mlp_{}'.format(weak_learner_id), reuse=tf.AUTO_REUSE):
-        out = tf.layers.dense(features, params.residual_mlp_sizes[0],
-            name='residual_{}_dense_0'.format(weak_learner_id), activation=tf.nn.relu)
+    with tf.variable_scope(f'residual_mlp_{weak_learner_id}', reuse=tf.AUTO_REUSE):
+        out = tf.layers.dense(
+            features,
+            params.residual_mlp_sizes[0],
+            name=f'residual_{weak_learner_id}_dense_0',
+            activation=tf.nn.relu,
+        )
         for i in range(1, len(params.residual_mlp_sizes)):
-            out = tf.layers.dense(out, params.residual_mlp_sizes[i], \
-                name='residual_{}_dense_{}'.format(weak_learner_id, i), activation=tf.nn.relu)
-        logits = tf.layers.dense(out, 1,
-            name='residual_{}_dense_{}'.format(weak_learner_id, len(params.residual_mlp_sizes)))
+            out = tf.layers.dense(
+                out,
+                params.residual_mlp_sizes[i],
+                name=f'residual_{weak_learner_id}_dense_{i}',
+                activation=tf.nn.relu,
+            )
+        logits = tf.layers.dense(
+            out,
+            1,
+            name=f'residual_{weak_learner_id}_dense_{len(params.residual_mlp_sizes)}',
+        )
     return logits
 
 def _get_mlp_logits(features, params):
@@ -88,10 +99,13 @@ def _get_mlp_logits(features, params):
         out = tf.layers.dense(features, params.mlp_sizes[0], \
             name='dense_0', activation=tf.nn.relu)
         for i in range(1, len(params.mlp_sizes)):
-            out = tf.layers.dense(out, params.mlp_sizes[i], \
-                name='dense_{}'.format(i), activation=tf.nn.relu)
-        logits = tf.layers.dense(out, 1, \
-            name='dense_{}'.format(len(params.mlp_sizes)))
+            out = tf.layers.dense(
+                out,
+                params.mlp_sizes[i],
+                name=f'dense_{i}',
+                activation=tf.nn.relu,
+            )
+        logits = tf.layers.dense(out, 1, name=f'dense_{len(params.mlp_sizes)}')
     return logits
 
 def get_permutation_loss(labels, predicted_scores):
@@ -405,7 +419,7 @@ def rnnC2(x, hprev, params):
 
 def _get_rnn_x_prev(labels, x, current, rnn_state_size, params):
     true_label = tf.squeeze(tf.reduce_max(labels))
-          
+
     keep_indices = tf.where(tf.not_equal(tf.squeeze(labels), true_label))
     x = tf.gather_nd(x, keep_indices)
     x = tf.reshape(x, [-1, rnn_state_size])
@@ -414,14 +428,12 @@ def _get_rnn_x_prev(labels, x, current, rnn_state_size, params):
     ok_label_indices = tf.where(tf.equal(tf.squeeze(labels), true_label))
     # ht
     keep_hts = tf.gather_nd(current, ok_label_indices)
-    if params.pooling == 'MP':
+    if params.pooling == 'MP' or params.pooling != 'AP':
         # max
         ht_1 = tf.reduce_max(keep_hts, keepdims=True, axis=0)
-    elif params.pooling == 'AP':
+    else:
         # mean
         ht_1 = tf.reduce_mean(keep_hts, keepdims=True, axis=0)
-    else:
-        ht_1 = tf.reduce_max(keep_hts, keepdims=True, axis=0)
     ht_1 = tf.reshape(ht_1, [1, rnn_state_size])
     return x, ht_1
 
@@ -571,25 +583,15 @@ def _get_actions_ratings(keep_labels, total_predicted_scores, iteration, is_trai
     true_label = tf.squeeze(tf.reduce_max(keep_labels))
     ok_label_indices = tf.where(tf.equal(tf.squeeze(keep_labels), true_label))
     # take the only one index that gives the current prediction score during validation and inference
-    prediction_index = tf.argmax(total_predicted_scores, axis=0)    
-    if is_training:
-        # keep_labels [-1, 1]
-        # take all indices
-        action_index = ok_label_indices
-    else:
-        # take the only one index
-        action_index = prediction_index
+    prediction_index = tf.argmax(total_predicted_scores, axis=0)
+    action_index = ok_label_indices if is_training else prediction_index
     action_index = tf.cast(action_index, tf.int32)
     action_index = tf.reshape(action_index, [-1, 1])
-    if is_training:
-        # take all indices
-        rating = tf.gather_nd(keep_labels, action_index)
-        # action = rating
-    else:
-        # take the only one index
-        # action = tf.cast(iteration, dtype=tf.float32)
-        rating = tf.gather(keep_labels, action_index)
-    return rating
+    return (
+        tf.gather_nd(keep_labels, action_index)
+        if is_training
+        else tf.gather(keep_labels, action_index)
+    )
 
 def _get_rnn_leave_one_predictions_labels(keep_labels, keep_predicted_scores, 
     x, current, n_data, action_index, rnn_state_size):
@@ -776,13 +778,8 @@ def build_model(is_training, inputs, params, weak_learner_id):
     if params.loss_fn == 'mdprank':
         if is_training:
             # inputs['labels'], logits = sample.softmax_sample(inputs['labels'], logits)
-            if random.random() < params.exploration:
-                # random
-                pass
-            else:
+            if random.random() >= params.exploration:
                 inputs['labels'], logits = sample.softmax_sample(inputs['labels'], logits)
-                # # the max action
-                # inputs['labels'], logits = math_fns.get_logit_orders(inputs['labels'], logits)
         else:
             # # the max action
             inputs['labels'], logits = math_fns.get_logit_orders(inputs['labels'], logits)
@@ -827,16 +824,8 @@ def model_fn(mode, inputs, params, reuse=False, weak_learner_id=0):
     # Metrics for evaluation using tf.metrics (average over whole dataset)
     with tf.variable_scope("metrics"):
         ndcg_top_ks =  params.top_ks
-        use_err_metric = False
-        use_loss_metrics = False
-        # loss = tf.Print(loss, [loss], message="The loss is : \n", summarize=200)    
-        if is_training:
-            use_loss_metrics = True
-        if is_test:
-            # do not report err in training or validation
-            # for fast training
-            # report err in test
-            use_err_metric = True
+        use_loss_metrics = is_training
+        use_err_metric = is_test
         if 'no_ndcg' in inputs:
             use_ndcg_metrics = False
             metrics = search_metrics.get_search_metric_fn(labels, predictions, \
@@ -845,8 +834,8 @@ def model_fn(mode, inputs, params, reuse=False, weak_learner_id=0):
                 use_ndcg_metrics=use_ndcg_metrics)
         else:
             metrics = search_metrics.get_search_metric_fn(labels, predictions, \
-                ndcg_top_ks=ndcg_top_ks, use_binary_metrics=False, use_err_metric=use_err_metric)        
-        if use_loss_metrics == True:
+                ndcg_top_ks=ndcg_top_ks, use_binary_metrics=False, use_err_metric=use_err_metric)
+        if use_loss_metrics:
             # Summaries for training
             tf.summary.scalar('loss', loss)            
             # metrics.update(loss_metric)

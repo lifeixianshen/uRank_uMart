@@ -40,7 +40,9 @@ if __name__ == '__main__':
     # Load the parameters from the experiment params.json file in model_dir
     args = parser.parse_args()
     json_path = os.path.join(args.model_dir, 'params.json')
-    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    assert os.path.isfile(
+        json_path
+    ), f"No json configuration file found at {json_path}"
     params = Params(json_path)
     # print('params.mlp_sizes\n', params.mlp_sizes)
     # print('params.top_ks\n', params.top_ks)
@@ -50,12 +52,18 @@ if __name__ == '__main__':
 
     # # Load the parameters from the dataset, that gives the size etc. into params
     json_path = os.path.join(args.data_dir, 'dataset_params.json')
-    assert os.path.isfile(json_path), "No json file found at {}, please run prepare_data.py".format(json_path)
+    assert os.path.isfile(
+        json_path
+    ), f"No json file found at {json_path}, please run prepare_data.py"
     params.update(json_path)
     # Set the logger
     set_logger(os.path.join(args.model_dir, 'train.log'))
-    path_train_tfrecords = os.path.join(args.data_dir, 'train_' + args.tfrecords_filename)
-    path_eval_tfrecords = os.path.join(args.data_dir, 'vali_' + args.tfrecords_filename)
+    path_train_tfrecords = os.path.join(
+        args.data_dir, f'train_{args.tfrecords_filename}'
+    )
+    path_eval_tfrecords = os.path.join(
+        args.data_dir, f'vali_{args.tfrecords_filename}'
+    )
     # Create the input data pipeline
     logging.info("Creating the datasets...")
     train_dataset = load_dataset_from_tfrecords(path_train_tfrecords)
@@ -73,11 +81,13 @@ if __name__ == '__main__':
     # Train the model
     # log time
     start_time = time.time()
-    logging.info("Starting training for at most {} epoch(s) for the initial learner".format(params.num_epochs))
+    logging.info(
+        f"Starting training for at most {params.num_epochs} epoch(s) for the initial learner"
+    )
     global_epoch = train_and_evaluate(train_model_spec, eval_model_spec, args.model_dir, params, \
         learner_id=0, restore_from=args.restore_dir)
-    logging.info("global_epoch: {} epoch(s) at learner 0".format(global_epoch))
-    print("--- %s seconds ---" % (time.time() - start_time))
+    logging.info(f"global_epoch: {global_epoch} epoch(s) at learner 0")
+    print(f"--- {time.time() - start_time} seconds ---")
     # start gradient boosting
     last_global_epoch = global_epoch
     if (params.num_learners > 1):
@@ -96,9 +106,9 @@ if __name__ == '__main__':
             global_epoch = train_and_evaluate(residual_train_model_spec, residual_eval_model_spec,
                 args.model_dir, params, learner_id=learner_id, restore_from=args.restore_dir, \
                 global_epoch=global_epoch)
-            logging.info("global_epoch: {} epoch(s) at learner {}".format(global_epoch, learner_id))
+            logging.info(f"global_epoch: {global_epoch} epoch(s) at learner {learner_id}")
             if global_epoch - last_global_epoch == params.early_stoping_epochs:
-                logging.info("boosting has stopped early at learner {}".format(learner_id))
+                logging.info(f"boosting has stopped early at learner {learner_id}")
                 break
             last_global_epoch = global_epoch
-    print("--- %s seconds using boosting ---" % (time.time() - start_time))
+    print(f"--- {time.time() - start_time} seconds using boosting ---")

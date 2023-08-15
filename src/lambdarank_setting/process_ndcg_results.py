@@ -2,8 +2,7 @@ import glob
 import pandas as pd
 
 def getPaths():
-	txt_files = glob.glob('*.txt')
-	return txt_files
+	return glob.glob('*.txt')
 	# for file_path in txt_files:
 	# 	print(file_path)
 

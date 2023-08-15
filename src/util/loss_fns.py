@@ -19,11 +19,12 @@ def get_equal_pair_loss(pairwise_label_scores, pairwise_predicted_scores,
     average loss over pairs defined by the masks
   """
   mask, pair_count = masks.equal_mask(pairwise_label_scores)
-  # pairwise sigmoid_cross_entropy_with_logits loss
-  loss = tf.cond(tf.equal(pair_count, 0), lambda: 0.,
-    lambda: _get_average_cross_entropy_loss(pairwise_label_scores,
-      pairwise_predicted_scores, mask, pair_count))
-  return loss
+  return tf.cond(
+      tf.equal(pair_count, 0),
+      lambda: 0.0,
+      lambda: _get_average_cross_entropy_loss(
+          pairwise_label_scores, pairwise_predicted_scores, mask, pair_count),
+  )
 
 def get_pair_loss(pairwise_label_scores, pairwise_predicted_scores,
                   params):
@@ -45,17 +46,16 @@ def get_pair_loss(pairwise_label_scores, pairwise_predicted_scores,
     # full_mask that only covers pairs that have different labels
     # (all pairwise_label_scores = 0.5: selfs and same labels are 0s)
     mask, pair_count = masks.full_mask(pairwise_label_scores)
-  elif params.mask == "diag_mask":
+  else:
     # diag_mask that covers all pairs
     # (only selfs/diags are 0s)
     mask, pair_count = masks.diag_mask(pairwise_label_scores)
-  else:
-    mask, pair_count = masks.diag_mask(pairwise_label_scores)
-  # pairwise sigmoid_cross_entropy_with_logits loss
-  loss = tf.cond(tf.equal(pair_count, 0), lambda: 0.,
-    lambda: _get_average_cross_entropy_loss(pairwise_label_scores,
-      pairwise_predicted_scores, mask, pair_count))
-  return loss
+  return tf.cond(
+      tf.equal(pair_count, 0),
+      lambda: 0.0,
+      lambda: _get_average_cross_entropy_loss(
+          pairwise_label_scores, pairwise_predicted_scores, mask, pair_count),
+  )
 
 
 def get_lambda_pair_loss(pairwise_label_scores, pairwise_predicted_scores,
@@ -90,11 +90,17 @@ def get_lambda_pair_loss(pairwise_label_scores, pairwise_predicted_scores,
     # (only selfs/diags are 0s)
     mask, pair_count = masks.diag_mask(pairwise_label_scores)
 
-  # pairwise sigmoid_cross_entropy_with_logits loss
-  loss = tf.cond(tf.equal(pair_count, 0), lambda: 0.,
-    lambda: _get_average_cross_entropy_loss(pairwise_label_scores,
-      pairwise_predicted_scores, mask, pair_count, swapped_ndcg))
-  return loss
+  return tf.cond(
+      tf.equal(pair_count, 0),
+      lambda: 0.0,
+      lambda: _get_average_cross_entropy_loss(
+          pairwise_label_scores,
+          pairwise_predicted_scores,
+          mask,
+          pair_count,
+          swapped_ndcg,
+      ),
+  )
 
 
 def _get_average_cross_entropy_loss(pairwise_label_scores, pairwise_predicted_scores,
@@ -172,9 +178,7 @@ def _get_ordered_predicted_scores(labels, predicted_scores, n_data):
   sorted_labels, ordered_labels_indices = tf.nn.top_k(
     tf.transpose(labels), k=n_data)
   ordered_labels_indices = tf.transpose(ordered_labels_indices)
-  predicted_scores_ordered_by_labels = tf.gather_nd(predicted_scores,
-    ordered_labels_indices)
-  return predicted_scores_ordered_by_labels
+  return tf.gather_nd(predicted_scores, ordered_labels_indices)
 
 
 def get_attrank_loss(labels, predicted_scores, weights=None):
@@ -198,8 +202,7 @@ def get_attrank_loss(labels, predicted_scores, weights=None):
   attention_labels = _get_attentions(reshaped_labels)
   reshaped_predicted_scores = tf.reshape(predicted_scores, [1, -1])
   attention_predicted_scores = tf.nn.softmax(reshaped_predicted_scores)
-  loss = _get_attrank_cross_entropy(attention_labels, attention_predicted_scores)
-  return loss
+  return _get_attrank_cross_entropy(attention_labels, attention_predicted_scores)
 
 
 def _get_attentions(raw_scores):
@@ -214,9 +217,7 @@ def _get_attentions(raw_scores):
   expon_labels = mask * tf.exp(raw_scores)
 
   expon_label_sum = tf.reduce_sum(expon_labels)
-  # expon_label_sum is safe as a denominator
-  attentions = math_fns.safe_div_zero(expon_labels, expon_label_sum)
-  return attentions
+  return math_fns.safe_div_zero(expon_labels, expon_label_sum)
 
 
 def _get_attrank_cross_entropy(labels, logits):
@@ -224,8 +225,7 @@ def _get_attrank_cross_entropy(labels, logits):
   # do not use this function directly elsewhere
   results = labels * math_fns.safe_log(logits) + (1 - labels) * math_fns.safe_log(1 - logits)
   results = (-1) * results
-  results = tf.reduce_mean(results)
-  return results
+  return tf.reduce_mean(results)
 
 
 def get_listnet_loss(labels, predicted_scores, weights=None):
@@ -251,15 +251,13 @@ def get_listnet_loss(labels, predicted_scores, weights=None):
 
 
   if weights is None:
-    loss = tf.reduce_mean(
+    return tf.reduce_mean(
+        _get_listnet_cross_entropy(labels=labels_top_one_probs,
+                                   logits=predicted_scores_top_one_probs))
+  return tf.reduce_mean(
       _get_listnet_cross_entropy(labels=labels_top_one_probs,
-      logits=predicted_scores_top_one_probs))
-    return loss
-
-  loss = tf.reduce_mean(
-    _get_listnet_cross_entropy(labels=labels_top_one_probs,
-    logits=predicted_scores_top_one_probs) * weights) / tf.reduce_mean(weights)
-  return loss
+                                 logits=predicted_scores_top_one_probs) *
+      weights) / tf.reduce_mean(weights)
 
 
 def _get_top_one_probs(labels):
@@ -270,9 +268,7 @@ def _get_top_one_probs(labels):
   """
   expon_labels = tf.exp(labels)
   expon_label_sum = tf.reduce_sum(expon_labels)
-  # expon_label_sum is safe as a denominator
-  attentions = expon_labels / expon_label_sum
-  return attentions
+  return expon_labels / expon_label_sum
 
 
 def _get_listnet_cross_entropy(labels, logits):
@@ -283,11 +279,7 @@ def _get_listnet_cross_entropy(labels, logits):
   and predicted/logits top-one probabilities
   for a query/batch/batchPreidictionRequest
   """
-  # it is safe to use log on logits
-  # that come from _get_top_one_probs
-  # do not use this function directly elsewhere
-  results = (-1) * labels * math_fns.safe_log(logits)
-  return results
+  return (-1) * labels * math_fns.safe_log(logits)
 
 
 def get_pointwise_loss(labels, predicted_scores, weights=None):
@@ -302,13 +294,13 @@ def get_pointwise_loss(labels, predicted_scores, weights=None):
     average loss
   """
   if weights is None:
-    loss = tf.reduce_mean(
+    return tf.reduce_mean(
+        tf.nn.sigmoid_cross_entropy_with_logits(labels=labels,
+                                                logits=predicted_scores))
+  return tf.reduce_mean(
       tf.nn.sigmoid_cross_entropy_with_logits(labels=labels,
-      logits=predicted_scores))
-    return loss
-  loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels,
-        logits=predicted_scores) * weights) / tf.reduce_mean(weights)
-  return loss
+                                              logits=predicted_scores) *
+      weights) / tf.reduce_mean(weights)
 
 
 def _get_average_hinge_loss(pairwise_label_scores, pairwise_predicted_scores,
@@ -345,11 +337,12 @@ def get_hinge_loss(pairwise_label_scores, pairwise_predicted_scores,
   # converted to -1, 1 labels
   mask, pair_count = masks.full_mask(pairwise_label_scores)
 
-  # pairwise sigmoid_cross_entropy_with_logits loss
-  loss = tf.cond(tf.equal(pair_count, 0), lambda: 0.,
-    lambda: _get_average_hinge_loss(pairwise_label_scores,
-      pairwise_predicted_scores, mask, pair_count))
-  return loss
+  return tf.cond(
+      tf.equal(pair_count, 0),
+      lambda: 0.0,
+      lambda: _get_average_hinge_loss(
+          pairwise_label_scores, pairwise_predicted_scores, mask, pair_count),
+  )
 
 
 def get_mdprank_loss(labels, predicted_scores):
